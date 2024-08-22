@@ -12,7 +12,7 @@ app.use(bodyParser.json({ limit: '10mb' })); // base64の画像を大きいサ�
 app.post('/add-label', async (req: Request, res: Response) => {
   const { image, label, font } = req.body;
 
-  if (!image || !label || !font) {
+  if (!image || !label) {
     return res.status(400).json({ error: 'Image, label, and font are required.' });
   }
 
@@ -21,9 +21,17 @@ app.post('/add-label', async (req: Request, res: Response) => {
     const loadedImage = await Jimp.read(imageBuffer);
 
     // フォントのロード。指定されたフォントを使用
-    const fontPath = path.join(__dirname, 'fonts', `${font}.fnt`);
-    if (!fs.existsSync(fontPath)) {
-      return res.status(400).json({ error: 'Font not found.' });
+    let fontPath: string;
+    switch (font) {
+      case 'sans':
+        fontPath = Jimp.FONT_SANS_32_BLACK;
+        break;
+      case 'serif':
+        fontPath = Jimp.FONT_SANS_32_WHITE;
+        break;
+      default:
+        fontPath = Jimp.FONT_SANS_32_BLACK;
+        break;
     }
     const loadedFont = await Jimp.loadFont(fontPath);
 
