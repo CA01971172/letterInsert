@@ -1,0 +1,8 @@
+version: '3.7'
+services:
+  insert-letters:
+    build:
+      context: ./insert-letters
+      dockerfile: Dockerfile
+    ports:
+      - 8001:80

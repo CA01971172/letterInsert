@@ -1,0 +1,2 @@
+- `docker-compose up -d --build`
+- `http://localhost:8080/insert-letters?image=___&label=___`
