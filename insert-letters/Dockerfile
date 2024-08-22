@@ -30,5 +30,8 @@ RUN npm install --omit=dev && npm cache clean --force
 # builder からビルド結果だけコピー
 COPY --from=builder /work/dist ./dist
 
+# フォントファイルもコピー
+COPY ./src/fonts /work/dist/fonts
+
 # Node.js アプリを起動
 CMD ["node", "./dist/index.js"]

@@ -7,20 +7,59 @@ import fs from 'fs';
 const app = express();
 const PORT = process.env.PORT || 80;
 
-app.use(bodyParser.json({ limit: '10mb' })); // base64の画像を大きいサイズでも扱えるようにする
+app.use(bodyParser.json({ limit: '10mb' }));
+
+// Function to wrap text
+const wrapText = (text: string, font: any, maxWidth: number) => {
+  const lines: string[] = [];
+  let line = '';
+
+  text.split(' ').forEach(word => {
+    const testLine = line + (line ? ' ' : '') + word;
+    const width = Jimp.measureText(font, testLine);
+    if (width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = testLine;
+    }
+  });
+
+  if (line) {
+    lines.push(line);
+  }
+
+  return lines;
+};
+
+// Function to add vertical text
+const addVerticalText = (image: Jimp, text: string, font: any, x: number, y: number) => {
+  const chars = text.split('');
+  const charWidth = Jimp.measureText(font, chars[0]);
+  const charHeight = Jimp.measureTextHeight(font, chars[0], charWidth);
+
+  chars.forEach((char, index) => {
+    image.print(font, x, y + (charHeight * index), char);
+  });
+};
 
 app.post('/add-label', async (req: Request, res: Response) => {
-  const { image, label, font } = req.body;
+  const { image: base64Image, label, font } = req.body;
 
-  if (!image || !label) {
-    return res.status(400).json({ error: 'Image, label, and font are required.' });
+  const vertical = true
+  const x = 300
+  const y = 300
+  const maxWidth = 300
+
+  if (!base64Image || !label) {
+    return res.status(400).json({ error: 'Image and label are required.' });
   }
 
   try {
-    const imageBuffer = Buffer.from(image, 'base64');
+    const imageBuffer = Buffer.from(base64Image, 'base64');
     const loadedImage = await Jimp.read(imageBuffer);
 
-    // フォントのロード。指定されたフォントを使用
+    // Load the font
     let fontPath: string;
     switch (font) {
       case 'sans':
@@ -30,19 +69,35 @@ app.post('/add-label', async (req: Request, res: Response) => {
         fontPath = Jimp.FONT_SANS_32_WHITE;
         break;
       default:
-        fontPath = Jimp.FONT_SANS_32_BLACK;
+        fontPath = path.join(__dirname, 'fonts', `font.fnt`);
         break;
     }
     const loadedFont = await Jimp.loadFont(fontPath);
 
-    // 画像にラベルを追加
-    loadedImage.print(loadedFont, 10, 10, label);
+    // Wrap text if maxWidth is specified
+    const wrappedText = maxWidth ? wrapText(label, loadedFont, maxWidth) : [label];
 
-    // 画像を保存
+    // Calculate text positioning
+    const textHeight = wrappedText.length * Jimp.measureTextHeight(loadedFont, wrappedText[0], maxWidth);
+    const imageWidth = loadedImage.bitmap.width;
+    const imageHeight = loadedImage.bitmap.height;
+
+    let textY = y || (imageHeight - textHeight) / 2;
+
+    // Add the text to the image
+    if (vertical) {
+      addVerticalText(loadedImage, label, loadedFont, x || (imageWidth - Jimp.measureText(loadedFont, label)) / 2, textY);
+    } else {
+      wrappedText.forEach((line, index) => {
+        loadedImage.print(loadedFont, x || (imageWidth - Jimp.measureText(loadedFont, line)) / 2, textY + index * Jimp.measureTextHeight(loadedFont, line, maxWidth), line);
+      });
+    }
+
+    // Save the image
     const outputPath = path.join(__dirname, 'output', `image-${Date.now()}.png`);
     await loadedImage.writeAsync(outputPath);
 
-    // クライアントに画像のパスを返す
+    // Respond with the image URL
     const imageUrl = `${req.protocol}://${req.get('host')}/images/${path.basename(outputPath)}`;
     res.json({ imageUrl });
   } catch (error) {
@@ -51,7 +106,6 @@ app.post('/add-label', async (req: Request, res: Response) => {
   }
 });
 
-// 静的ファイルの提供
 app.use('/images', express.static(path.join(__dirname, 'output')));
 
 app.listen(PORT, () => {
