@@ -47,9 +47,9 @@ app.post('/add-label', async (req: Request, res: Response) => {
   const { image: base64Image, label, font } = req.body;
 
   const vertical = true
-  const x = 300
-  const y = 300
-  const maxWidth = 300
+  const x = 275
+  const y = 150
+  const maxWidth = 100
 
   if (!base64Image || !label) {
     return res.status(400).json({ error: 'Image and label are required.' });
