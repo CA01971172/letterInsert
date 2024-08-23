@@ -9,48 +9,64 @@ const PORT = process.env.PORT || 80;
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
-// Function to wrap text
-const wrapText = (text: string, font: any, maxWidth: number) => {
-  const lines: string[] = [];
+// Function to add vertical text with center alignment
+const addVerticalTextWithCenter = (image: Jimp, text: string, font: any, startX: number, startY: number, maxWidth: number, maxHeight: number) => {
+  const chars = text.split('');
+  const charWidth = Jimp.measureText(font, chars[0]);
+  const charHeight = Jimp.measureTextHeight(font, chars[0], charWidth);
+
+  // Calculate how many lines are needed and the total width of the text block
+  let lines: string[] = [];
   let line = '';
 
-  text.split(' ').forEach(word => {
-    const testLine = line + (line ? ' ' : '') + word;
+  // Calculate vertical lines (columns) and their widths
+  for (let char of chars) {
+    const testLine = line + char;
     const width = Jimp.measureText(font, testLine);
     if (width > maxWidth) {
       lines.push(line);
-      line = word;
+      line = char;
     } else {
       line = testLine;
     }
-  });
+  }
 
   if (line) {
     lines.push(line);
   }
 
-  return lines;
-};
+  // Calculate total text block width
+  const textBlockWidth = lines.length * charWidth;
 
-// Function to add vertical text
-const addVerticalText = (image: Jimp, text: string, font: any, x: number, y: number) => {
-  const chars = text.split('');
-  const charWidth = Jimp.measureText(font, chars[0]);
-  const charHeight = Jimp.measureTextHeight(font, chars[0], charWidth);
+  // Calculate starting x position for center alignment
+  let currentX = startX + textBlockWidth / 2 + charWidth / 2;
+  let currentY = startY;
 
-  chars.forEach((char, index) => {
-    image.print(font, x, y + (charHeight * index), char);
-  });
+  // Draw the text
+  for (const line of lines) {
+    for (const char of line) {
+      if (currentY + charHeight > startY + maxHeight) {
+        // If text exceeds the maxHeight, wrap to next line
+        currentY = startY;
+        currentX -= charWidth;  // Move left for new vertical column
+      }
+      image.print(font, currentX, currentY, char);
+      currentY += charHeight;
+    }
+    // Move to the next vertical column
+    currentY = startY;
+    currentX -= charWidth;
+  }
 };
 
 app.post('/add-label', async (req: Request, res: Response) => {
   const { image: base64Image, label, font } = req.body;
 
-  const vertical = true
-  const x = 275
-  const y = 150
-  const maxWidth = 300
-  const maxHeight = 400
+  const vertical = true;
+  const x = 187.5;
+  const y = 150;
+  const maxWidth = 400;
+  const maxHeight = 400;
 
   if (!base64Image || !label) {
     return res.status(400).json({ error: 'Image and label are required.' });
@@ -75,29 +91,8 @@ app.post('/add-label', async (req: Request, res: Response) => {
     }
     const loadedFont = await Jimp.loadFont(fontPath);
 
-    // 縦書き文字の配置
-    let currentX = x;
-    let currentY = y;
-
-    for (const char of label) {
-      const charWidth = Jimp.measureText(loadedFont, char);
-      const charHeight = Jimp.measureTextHeight(loadedFont, char, maxWidth);
-
-      // 行末の処理
-      if (currentY + charHeight > y + maxHeight) {
-        // 左方向に折り返し
-        currentY = y;
-        currentX -= charWidth;
-      }
-
-      // 幅の制限を超える場合はループを終了
-      if (currentX < x - maxWidth) {
-        break;
-      }
-
-      loadedImage.print(loadedFont, currentX, currentY, char);
-      currentY += charHeight;
-    }
+    // Add vertical text with center alignment
+    addVerticalTextWithCenter(loadedImage, label, loadedFont, x, y, maxWidth, maxHeight);
 
     // Save the image
     const outputPath = path.join(__dirname, 'output', `image-${Date.now()}.png`);
