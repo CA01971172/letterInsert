@@ -99,7 +99,8 @@ app.post('/add-label', async (req: Request, res: Response) => {
     await loadedImage.writeAsync(outputPath);
 
     // Respond with the image URL
-    const imageUrl = `${req.protocol}://${req.get('host')}/images/${path.basename(outputPath)}`;
+    // const imageUrl = `${req.protocol}://${req.get('host')}/images/${path.basename(outputPath)}`;
+    const imageUrl = `${req.protocol}://localhost:8001/images/${path.basename(outputPath)}`;
     res.json({ imageUrl });
   } catch (error) {
     console.error(error);
