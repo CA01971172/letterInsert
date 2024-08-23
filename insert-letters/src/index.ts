@@ -49,7 +49,8 @@ app.post('/add-label', async (req: Request, res: Response) => {
   const vertical = true
   const x = 275
   const y = 150
-  const maxWidth = 100
+  const maxWidth = 300
+  const maxHeight = 400
 
   if (!base64Image || !label) {
     return res.status(400).json({ error: 'Image and label are required.' });
@@ -74,23 +75,28 @@ app.post('/add-label', async (req: Request, res: Response) => {
     }
     const loadedFont = await Jimp.loadFont(fontPath);
 
-    // Wrap text if maxWidth is specified
-    const wrappedText = maxWidth ? wrapText(label, loadedFont, maxWidth) : [label];
+    // 縦書き文字の配置
+    let currentX = x;
+    let currentY = y;
 
-    // Calculate text positioning
-    const textHeight = wrappedText.length * Jimp.measureTextHeight(loadedFont, wrappedText[0], maxWidth);
-    const imageWidth = loadedImage.bitmap.width;
-    const imageHeight = loadedImage.bitmap.height;
+    for (const char of label) {
+      const charWidth = Jimp.measureText(loadedFont, char);
+      const charHeight = Jimp.measureTextHeight(loadedFont, char, maxWidth);
 
-    let textY = y || (imageHeight - textHeight) / 2;
+      // 行末の処理
+      if (currentY + charHeight > y + maxHeight) {
+        // 左方向に折り返し
+        currentY = y;
+        currentX -= charWidth;
+      }
 
-    // Add the text to the image
-    if (vertical) {
-      addVerticalText(loadedImage, label, loadedFont, x || (imageWidth - Jimp.measureText(loadedFont, label)) / 2, textY);
-    } else {
-      wrappedText.forEach((line, index) => {
-        loadedImage.print(loadedFont, x || (imageWidth - Jimp.measureText(loadedFont, line)) / 2, textY + index * Jimp.measureTextHeight(loadedFont, line, maxWidth), line);
-      });
+      // 幅の制限を超える場合はループを終了
+      if (currentX < x - maxWidth) {
+        break;
+      }
+
+      loadedImage.print(loadedFont, currentX, currentY, char);
+      currentY += charHeight;
     }
 
     // Save the image
